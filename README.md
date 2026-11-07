@@ -29,10 +29,15 @@ The build may take a few minutes, but when it's done the winmd file should be in
 > In case of build issues, make sure the **ClangSharpPInvokeGenerator** dotnet tool is not installed globally.
 
 ## What is generated
-* `Windows.Win32.Graphics.Direct3D12` from `d3d12.h`, `d3d12sdklayers.h`, `d3d12shader.h` and `d3d12compiler.h`.
-* `Windows.Win32.Graphics.Direct3D` from `d3dshadercacheregistration.h`.
+Everything goes in `Windows.Win32.Graphics.Direct3D12`, from `d3d12.h`, `d3d12sdklayers.h`, `d3d12shader.h`, `d3d12compiler.h` and `d3dshadercacheregistration.h`.
+The shader cache registration types used to be in `Windows.Win32.Graphics.Direct3D`, but `Windows.Win32.winmd` owns that namespace now.
 
 Everything else these headers use, DXGI, the common Direct3D types or the Windows foundation types, stays a reference to `Windows.Win32.winmd`.
+The `d3d11shader.h` constants that `d3d12shader.h` repeats are left out, see [exclusions.rsp](./exclusions.rsp).
+
+The dll names, documentation links and annotations come from the settings Microsoft builds its own winmds with.
+The build downloads them from the [win32metadata](https://github.com/microsoft/win32metadata) release named by `Win32MetadataSettingsTag`,
+which should follow the version of the `Microsoft.Windows.WinmdGenerator` SDK.
 
 ## Updating the Metadata
 When a new Agility SDK is released, update this version number in [D3D12Win32Metadata.csproj](./D3D12Win32Metadata.csproj):
