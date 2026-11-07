@@ -1,0 +1,98 @@
+<Project Sdk="Microsoft.Windows.WinmdGenerator/0.71.45-preview">
+
+	<PropertyGroup>
+		<AgilitySdkVersion>1.620.1</AgilitySdkVersion>
+		<OutputWinmd>bin\Microsoft.Direct3D.D3D12.winmd</OutputWinmd>
+
+		<!-- a replacement for the D3D12 winmd of Microsoft.Windows.SDK.Win32Metadata must keep the identity Windows.Win32.winmd refers to. -->
+		<WinmdVersion>1.0.0.0</WinmdVersion>
+		<GenerateAssemblyVersionInfo>false</GenerateAssemblyVersionInfo>
+		<UseWinSDKAssets>true</UseWinSDKAssets>
+
+		<!-- the Windows SDK package sets a TargetPlatformVersion newer than the ones the .NET SDK knows, only its headers are used here. -->
+		<TargetPlatformVersionSupported>true</TargetPlatformVersionSupported>
+
+		<!-- the Agility SDK ships its own d3d12.h, d3dcommon.h and dxgiformat.h, they must win over the Windows SDK ones. -->
+		<AdditionalIncludes>$(PkgMicrosoft_Direct3D_D3D12)\build\native\include</AdditionalIncludes>
+	</PropertyGroup>
+
+	<!-- a build inside Visual Studio uses that instance, the command line asks vswhere for the latest one. -->
+	<Target Name="AddMsvcIncludes" BeforeTargets="CompileIdls;ScrapeHeaders">
+		<PropertyGroup>
+			<_VsInstallDir>$(VsInstallRoot)</_VsInstallDir>
+		</PropertyGroup>
+
+		<Exec Condition="'$(_VsInstallDir)' == ''" Command="&quot;$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe&quot; -latest -prerelease -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath" ConsoleToMSBuild="true" StandardOutputImportance="low">
+			<Output TaskParameter="ConsoleOutput" PropertyName="_VsInstallDir" />
+		</Exec>
+
+		<ReadLinesFromFile File="$(_VsInstallDir)\VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt">
+			<Output TaskParameter="Lines" PropertyName="_VcToolsVersion" />
+		</ReadLinesFromFile>
+
+		<PropertyGroup>
+			<_MsvcInclude>$(_VsInstallDir)\VC\Tools\MSVC\$(_VcToolsVersion.Trim())\include</_MsvcInclude>
+		</PropertyGroup>
+
+		<Error Condition="!Exists('$(_MsvcInclude)')" Text="MSVC include folder not found: '$(_MsvcInclude)'." />
+
+		<PropertyGroup>
+			<AdditionalIncludes>$(AdditionalIncludes);$(_MsvcInclude)</AdditionalIncludes>
+		</PropertyGroup>
+		<Message Importance="high" Text="MSVC includes: $(_MsvcInclude)" />
+	</Target>
+
+	<ItemGroup>
+		<Direct3D12Headers Include="$(PkgMicrosoft_Direct3D_D3D12)\build\native\include\d3d12.h" />
+		<Direct3D12Headers Include="$(PkgMicrosoft_Direct3D_D3D12)\build\native\include\d3d12sdklayers.h" />
+		<Direct3D12Headers Include="$(PkgMicrosoft_Direct3D_D3D12)\build\native\include\d3d12shader.h" />
+		<Direct3D12Headers Include="$(PkgMicrosoft_Direct3D_D3D12)\build\native\include\d3d12compiler.h" />
+
+		<!-- Windows.Win32.winmd already owns Windows.Win32.Graphics.Direct3D, a second Apis class there would compete with its own. -->
+		<Direct3D12Headers Include="$(PkgMicrosoft_Direct3D_D3D12)\build\native\include\d3dshadercacheregistration.h" />
+
+		<Partition Include="main.cpp">
+			<TraverseFiles>@(Direct3D12Headers)</TraverseFiles>
+			<Namespace>Windows.Win32.Graphics.Direct3D12</Namespace>
+			<ExcludeFromCrossarch>true</ExcludeFromCrossarch>
+		</Partition>
+	</ItemGroup>
+
+	<!-- the settings Microsoft builds its own winmds with, they give the dll names, documentation links and annotations. -->
+	<PropertyGroup>
+		<Win32MetadataSettingsTag>v71.0.45-preview</Win32MetadataSettingsTag>
+		<Win32MetadataSettingsUrl>https://raw.githubusercontent.com/microsoft/win32metadata/$(Win32MetadataSettingsTag)/generation/WinSDK</Win32MetadataSettingsUrl>
+		<Win32MetadataSettingsDir>$(MSBuildProjectDirectory)\obj\WinSDK\$(Win32MetadataSettingsTag)</Win32MetadataSettingsDir>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<_ScraperSettings Include="libMappings.rsp;libMappingsManual.rsp;supportedOS.rsp;WithSetLastError.rsp" />
+		<_ConstantsScraperSettings Include="ConstantsScraper.settings.rsp;requiredNamespacesForNames.rsp" />
+		<_EmitterSettings Include="emitter.settings.rsp;requiredNamespacesForNames.rsp;documentationMappings.rsp" />
+
+		<!-- constants whose macros the scraper cannot evaluate. -->
+		<_ManualSettings Include="manual\Direct3D12.cs" />
+		<Win32MetadataSettings Include="@(_ScraperSettings);@(_ConstantsScraperSettings);@(_EmitterSettings);@(_ManualSettings)" />
+
+		<ScraperRsp Include="@(_ScraperSettings->'$(Win32MetadataSettingsDir)\%(Identity)')" />
+		<ConstantsScraperRsp Include="@(_ConstantsScraperSettings->'$(Win32MetadataSettingsDir)\%(Identity)')" />
+		<EmitterRsp Include="@(_EmitterSettings->'$(Win32MetadataSettingsDir)\%(Identity)')" />
+		<ManualCs Include="@(_ManualSettings->'$(Win32MetadataSettingsDir)\%(Identity)')" />
+	</ItemGroup>
+
+	<Target Name="DownloadWin32MetadataSettings" BeforeTargets="PrepScraperHeader;FilterRsps;ScrapeHeaders;CopyManualFilesToScraped">
+		<DownloadFile
+			SourceUrl="$(Win32MetadataSettingsUrl)/$([System.String]::Copy('%(Win32MetadataSettings.Identity)').Replace('\', '/'))"
+			DestinationFolder="$(Win32MetadataSettingsDir)\%(Win32MetadataSettings.RelativeDir)"
+			Condition="!Exists('$(Win32MetadataSettingsDir)\%(Win32MetadataSettings.Identity)')" />
+	</Target>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Direct3D.D3D12" Version="$(AgilitySdkVersion)" GeneratePathProperty="true" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Update="Microsoft.Windows.SDK.CPP" Version="10.0.28000.2705" />
+	</ItemGroup>
+
+</Project>
